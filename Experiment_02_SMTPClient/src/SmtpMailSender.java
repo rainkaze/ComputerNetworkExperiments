@@ -4,77 +4,91 @@ import java.util.Base64;
 import java.util.Scanner;
 
 /**
- * 使用 Socket 手动实现 SMTP 邮件发送客户端（明文协议，不依赖 JavaMail）
- * 发送流程：连接服务器 -> HELO -> AUTH LOGIN -> MAIL FROM -> RCPT TO -> DATA -> QUIT
+ * 使用Socket 手动实现SMTP邮件发送客户端，支持自动推断SMTP服务器和群发
+ * 发送流程：连接服务器 -> HELO -> AUTH LOGIN -> MAIL FROM -> RCPT TO xN -> DATA -> QUIT
  */
 public class SmtpMailSender {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
-        System.out.print("发送方邮箱（163邮箱）: ");
-        String fromEmail = scanner.nextLine();
+        System.out.print("发送方邮箱: ");
+        String fromEmail = scanner.nextLine().trim();
         System.out.print("授权码: ");
-        String authCode = scanner.nextLine();
-        System.out.print("接收方邮箱: ");
-        String toEmail = scanner.nextLine();
+        String authCode = scanner.nextLine().trim();
+        System.out.print("接收方邮箱（多个请用空格分隔）: ");
+        String toEmailsLine = scanner.nextLine().trim();
         System.out.print("邮件主题: ");
-        String subject = scanner.nextLine();
+        String subject = scanner.nextLine().trim();
         System.out.print("邮件正文内容: ");
-        String body = scanner.nextLine();
+        String body = scanner.nextLine().trim();
 
-        try {
-            // 连接 SMTP 服务器
-            Socket socket = new Socket("smtp.163.com", 25);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+        // 拆分收件人
+        String[] toEmails = toEmailsLine.split("\\s+");
 
-            System.out.println(reader.readLine()); // 服务器欢迎语
+        // 自动推断SMTP服务器及端口
+        String domain = fromEmail.substring(fromEmail.indexOf('@') + 1);
+        String smtpServer = "smtp." + domain;
+        int smtpPort = 25; // 普通SMTP端口
+        System.out.println("自动使用 SMTP 服务器: " + smtpServer + ", 端口: " + smtpPort);
 
-            // 1. 发送 HELO 指令
+        try (Socket socket = new Socket(smtpServer, smtpPort);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
+
+            // 服务器欢迎语
+            System.out.println(reader.readLine());
+
+            // 1. HELO
             sendCommand(writer, reader, "HELO localhost");
 
-            // 2. 认证：AUTH LOGIN
+            // 2. AUTH LOGIN
             sendCommand(writer, reader, "AUTH LOGIN");
-            sendCommand(writer, reader, Base64.getEncoder().encodeToString(fromEmail.getBytes()));  // 邮箱 base64
-            sendCommand(writer, reader, Base64.getEncoder().encodeToString(authCode.getBytes()));   // 授权码 base64
+            sendCommand(writer, reader, Base64.getEncoder().encodeToString(fromEmail.getBytes()));
+            sendCommand(writer, reader, Base64.getEncoder().encodeToString(authCode.getBytes()));
 
-            // 3. 指定发件人
+            // 3. MAIL FROM
             sendCommand(writer, reader, "MAIL FROM:<" + fromEmail + ">");
 
-            // 4. 指定收件人
-            sendCommand(writer, reader, "RCPT TO:<" + toEmail + ">");
+            // 4. 多个 RCPT TO
+            for (String to : toEmails) {
+                sendCommand(writer, reader, "RCPT TO:<" + to + ">");
+            }
 
-            // 5. 开始输入邮件内容
+            // 5. DATA
             sendCommand(writer, reader, "DATA");
+
+            // 构建邮件头
+            StringBuilder toHeader = new StringBuilder();
+            for (int i = 0; i < toEmails.length; i++) {
+                toHeader.append(toEmails[i]);
+                if (i < toEmails.length - 1) toHeader.append(", ");
+            }
             writer.write("Subject: " + subject + "\r\n");
             writer.write("From: " + fromEmail + "\r\n");
-            writer.write("To: " + toEmail + "\r\n");
-            writer.write("\r\n"); // 空行后是正文
+            writer.write("To: " + toHeader + "\r\n");
+            writer.write("\r\n"); // 空行后正文
             writer.write(body + "\r\n");
-            writer.write(".\r\n"); // 结束标志
+            writer.write(".\r\n");
             writer.flush();
             System.out.println(reader.readLine());
 
-            // 6. 结束连接
+            // 6. QUIT
             sendCommand(writer, reader, "QUIT");
 
-            writer.close();
-            reader.close();
-            socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    // 用于发送命令并接收服务器响应
+    // 发送命令并接收响应
     private static void sendCommand(BufferedWriter writer, BufferedReader reader, String command) throws IOException {
-        System.out.println("C: " + command);
+        System.out.println("send: " + command);
         writer.write(command + "\r\n");
         writer.flush();
         String line;
         while ((line = reader.readLine()) != null) {
-            System.out.println("S: " + line);
-            if (line.length() >= 4 && line.charAt(3) != '-') break; // 多行响应判断
+            System.out.println("reply: " + line);
+            if (line.length() >= 4 && line.charAt(3) != '-') break;
         }
     }
 }
