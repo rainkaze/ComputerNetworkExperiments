@@ -5,6 +5,7 @@
       <module fileurl="file://$PROJECT_DIR$/ComputerNetworkExperiments.iml" filepath="$PROJECT_DIR$/ComputerNetworkExperiments.iml" />
       <module fileurl="file://$PROJECT_DIR$/Experiment_01_WebServer/Experiment_01_WebServer.iml" filepath="$PROJECT_DIR$/Experiment_01_WebServer/Experiment_01_WebServer.iml" />
       <module fileurl="file://$PROJECT_DIR$/Experiment_02_SMTPClient/Experiment_02_SMTPClient.iml" filepath="$PROJECT_DIR$/Experiment_02_SMTPClient/Experiment_02_SMTPClient.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Experiment_03_GBN_SR/Experiment_03_GBN_SR.iml" filepath="$PROJECT_DIR$/Experiment_03_GBN_SR/Experiment_03_GBN_SR.iml" />
     </modules>
   </component>
 </project>
